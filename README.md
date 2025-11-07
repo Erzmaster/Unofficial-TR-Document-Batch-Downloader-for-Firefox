@@ -29,3 +29,8 @@ Select *Install from URL* and paste the link to the raw file or select *New* and
 
 After successful installation reload the page in question.
 
+## Browser settings
+
+In order for the script to successfully work, set "Datei speichern" ("Save file") for PDFs in the Browser settings (else it just opens a new tab for every PDF and does not download it automatically).
+
+![images/browser](images/Firefox_BrowserSettings.png)
