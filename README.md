@@ -19,11 +19,11 @@ Install Violentmonkey from [github.io](https://violentmonkey.github.io/).
 
 Open the Violent Monkey Dashboard.
 
-[]IMG]
+![images/dashboard](images/ViolentMonkey_Dashboard.png)
 
 To add a new script, click on the + button.
 
-![images/plus](images/plus.png)
+![images/plus](images/ViolentMonkey_Plus.png)
 
 Select *Install from URL* and paste the link to the raw file or select *New* and copy and paste the script code and hit *Save & Close*.
 
