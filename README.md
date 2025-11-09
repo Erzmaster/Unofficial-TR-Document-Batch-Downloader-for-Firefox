@@ -34,6 +34,10 @@ In order for the script to successfully work, set "Datei speichern" ("Save file"
 
 ![images/browser](images/Firefox_BrowserSettings.png)
 
+Also, please allow PopUps for the website Trade Republic.
+
+![images/popup](images/TradeRepublic_PopupAllow.png)
+
 ## Usage in TR
 
 The User Interface opens when navigating to https://app.traderepublic.com/profile/transactions and https://app.traderepublic.com/profile/activities
