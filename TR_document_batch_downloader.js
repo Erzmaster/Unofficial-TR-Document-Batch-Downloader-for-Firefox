@@ -2,7 +2,7 @@
 // @name         TR Document Batch Downloader
 // @version      2.0
 // @namespace    tr-batch-dl
-// @description  Automatically iterates Trade Republic transaction/activity tabs, opens each entry, and downloads linked documents with optional auto-renaming.
+// @description  Automatically iterates Trade Republic transaction/activity tabs, opens each entry, and downloads linked documents with optional auto-renaming of file names.
 // @match        https://app.traderepublic.com/*
 // @run-at       document-idle
 // @grant        GM_download
