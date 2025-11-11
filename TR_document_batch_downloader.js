@@ -2,7 +2,7 @@
 // @name         TR Document Batch Downloader
 // @version      2.0
 // @namespace    tr-batch-dl
-// @description  Automatically iterates Trade Republic transaction/activity tabs, opens each entry, and downloads linked documents with optional auto-renaming of file names.
+// @description  Automatically iterates Trade Republic transaction/activity tabs, opens each entry, and downloads linked documents with optional auto-renaming.
 // @match        https://app.traderepublic.com/*
 // @run-at       document-idle
 // @grant        GM_download
@@ -719,7 +719,7 @@
     const box = document.createElement('div');
     box.id = UI_ID;
     box.style.cssText = `
-      position: fixed; z-index: 999999; right: 12px; bottom: 12px;
+      position: fixed; z-index: 999999; left: 12px; bottom: 12px;
       background: rgba(20,20,20,.92); color: #fff; font: 12px system-ui, sans-serif;
       border-radius: 12px; padding: 12px; width: 300px; box-shadow: 0 6px 20px rgba(0,0,0,.45);
     `;
