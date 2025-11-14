@@ -880,6 +880,7 @@ resetAllBtn.addEventListener('click', () => {
         let listContainer = findScrollableListContainer();
         let items = getListItems();
         if (CFG.enableAutoListScroll && listContainer) {
+          ui.setStatus('Lade weitere Einträge …', '#ffd27a');
           let iterations = 0;
           while (true) {
             if (Number.isFinite(desiredCount) && items.length >= desiredCount) break;
@@ -895,6 +896,7 @@ resetAllBtn.addEventListener('click', () => {
         }
         log('Anzahl Listeneinträge:', items.length);
         if (!items.length) { ui.setStatus('Keine Einträge gefunden.', '#ffb4b4'); return; }
+        ui.setStatus('Suche Listeneinträge …', '#9fdcff');
 
         const endIdx  = (isNaN(endRaw) || endRaw < 0) ? (items.length - 1) : Math.min(endRaw, items.length - 1);
         log('Bereich:', { startIdx, endIdx });
@@ -904,12 +906,6 @@ resetAllBtn.addEventListener('click', () => {
           if (stopFlag) break;
 
           await ensureActiveTab(desiredPath);
-
-          items = getListItems();
-          if (i >= items.length && CFG.enableAutoListScroll && listContainer) {
-            await autoScrollListToLoadMore(listContainer);
-            items = getListItems();
-          }
           const item = items[i];
           if (!item) { log(`(${i}/${endIdx}) kein Item (nicht geladen) – skip`); continue; }
 
