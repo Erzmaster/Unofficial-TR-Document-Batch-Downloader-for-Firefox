@@ -873,15 +873,29 @@ resetAllBtn.addEventListener('click', () => {
       try {
         await ensureActiveTab(desiredPath);
 
-        let listContainer = findScrollableListContainer();
-        if (CFG.enableAutoListScroll && listContainer) await autoScrollListToLoadMore(listContainer);
+        const startIdx = Math.max(0, +ui.box.querySelector('#trbd-start').value || 0);
+        const endRaw  = +ui.box.querySelector('#trbd-end').value;
+        const desiredCount = (isNaN(endRaw) || endRaw < 0) ? Infinity : Math.max(0, endRaw) + 1;
 
+        let listContainer = findScrollableListContainer();
         let items = getListItems();
+        if (CFG.enableAutoListScroll && listContainer) {
+          let iterations = 0;
+          while (true) {
+            if (Number.isFinite(desiredCount) && items.length >= desiredCount) break;
+            const before = items.length;
+            await autoScrollListToLoadMore(listContainer);
+            items = getListItems();
+            iterations++;
+            if (items.length <= before) {
+              log('Preload beendet – Einträge geladen:', items.length, '(Scrolls:', iterations, ')');
+              break;
+            }
+          }
+        }
         log('Anzahl Listeneinträge:', items.length);
         if (!items.length) { ui.setStatus('Keine Einträge gefunden.', '#ffb4b4'); return; }
 
-        const startIdx = Math.max(0, +ui.box.querySelector('#trbd-start').value || 0);
-        const endRaw  = +ui.box.querySelector('#trbd-end').value;
         const endIdx  = (isNaN(endRaw) || endRaw < 0) ? (items.length - 1) : Math.min(endRaw, items.length - 1);
         log('Bereich:', { startIdx, endIdx });
         if (startIdx > endIdx) { ui.setStatus(`Ungültiger Bereich (${startIdx} > ${endIdx}).`, '#ffb4b4'); return; }
