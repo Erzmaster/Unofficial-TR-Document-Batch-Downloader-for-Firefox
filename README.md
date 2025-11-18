@@ -3,7 +3,7 @@ This violentmonkey script for Firefox enables a batch download/ mass download fo
 This userscript is an unofficial, private project and is not affiliated with, endorsed by, or supported by Trade Republic Bank GmbH.
 Use at your own risk. The author assumes no responsibility for any consequences resulting from its use. 
 
-# Violentmonkey
+## Violentmonkey
 To use this script, you need the browser extentension [Violentmonkey](https://violentmonkey.github.io/). This extension allows the execution of user scripts.
 Install the browser extension from the provided link.
 
