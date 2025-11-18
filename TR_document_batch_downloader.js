@@ -157,11 +157,15 @@
     const text = str.trim();
     let day, month, year;
 
-    // slash format (MM/DD[/YYYY])
+    // slash format (DD/MM[/YYYY] preferred; MM/DD if unambiguous)
     let match = text.match(/(\d{1,2})\/(\d{1,2})\/?(\d{2,4})?/);
     if (match) {
-      month = parseInt(match[1], 10);
-      day   = parseInt(match[2], 10);
+      const a = parseInt(match[1], 10);
+      const b = parseInt(match[2], 10);
+      // prefer day/month; fallback to month/day if it makes sense
+      if (a > 12 && b <= 12) { day = a; month = b; }
+      else if (b > 12 && a <= 12) { day = b; month = a; }
+      else { day = a; month = b; }
       if (match[3]) {
         year = parseInt(match[3], 10);
         if (year < 100) year += 2000;
@@ -198,9 +202,8 @@
 
   const resolveDateParts = (meta = {}) => {
     const fallbackYear = meta.itemYear || new Date().getFullYear();
-    return parseDateString(meta.docDate, fallbackYear) ||
-           parseDateString(meta.itemDate, fallbackYear) ||
-           null;
+    // Datum kommt aus dem Timeline-Subtitle; Jahr aus dem Month-Divider
+    return parseDateString(meta.itemDate || meta.itemSubtitle, fallbackYear) || null;
   };
 
   const formatDateParts = (parts, format) => {
@@ -220,15 +223,18 @@
     const title = item.querySelector('.timelineV2Event__title')?.textContent?.trim() || '';
     const itemYear = findYearForItem(item);
     const subtitleText = item.querySelector('.timelineV2Event__subtitle')?.textContent?.trim() || '';
+    // Immer Tag/Monat aus dem Subtitle ziehen (20.12. ... / 20/12 ...)
     let datePart = '';
     let subtitle = subtitleText;
-    if (subtitleText.includes(' - ')) {
+    const m = subtitleText.match(/^(\d{1,2}[./]\d{1,2})([^\d].*)?$/);
+    if (m) {
+      datePart = m[1].trim();
+      // führende Trenner/Punkte nach dem Datum entfernen
+      subtitle = (m[2] || '').replace(/^[\s.\-–—_/\\|]+/, '').trim();
+    } else if (subtitleText.includes(' - ')) {
       const parts = subtitleText.split(' - ');
-      datePart = parts.shift()?.trim() || '';
+      datePart = (parts.shift() || '').trim();
       subtitle = parts.join(' - ').trim();
-    } else if (/^\d{2}\.\d{2}\./.test(subtitleText)) {
-      datePart = subtitleText.trim();
-      subtitle = '';
     }
     return { itemTitle: title, itemDate: datePart, itemSubtitle: subtitle, itemYear };
   };
@@ -702,7 +708,7 @@
     const last = items[items.length - 1];
     if (!last) return null;
     const ctx = getTimelineItemContext(last);
-    const parts = resolveDateParts({ itemDate: ctx.itemDate, itemYear: ctx.itemYear });
+    const parts = resolveDateParts({ itemDate: ctx.itemDate, itemSubtitle: ctx.itemSubtitle, itemYear: ctx.itemYear });
     if (!parts) return null;
     const d = new Date(parts.year, parts.month - 1, parts.day);
     d.setHours(0, 0, 0, 0);
@@ -1127,7 +1133,7 @@ langEl?.addEventListener('change', () => {
           if (!item) { log(`(${i}/${endIdx}) kein Item (nicht geladen) – skip`); continue; }
 
           const itemCtx = getTimelineItemContext(item);
-          const dateParts = resolveDateParts({ itemDate: itemCtx.itemDate, itemYear: itemCtx.itemYear });
+          const dateParts = resolveDateParts({ itemDate: itemCtx.itemDate, itemSubtitle: itemCtx.itemSubtitle, itemYear: itemCtx.itemYear });
           let itemDateObj = null;
           if (dateParts) {
             itemDateObj = new Date(dateParts.year, dateParts.month - 1, dateParts.day);
