@@ -679,6 +679,18 @@
     return document.scrollingElement || document.documentElement;
   };
 
+  const getLastItemDate = () => {
+    const items = getListItems();
+    const last = items[items.length - 1];
+    if (!last) return null;
+    const ctx = getTimelineItemContext(last);
+    const parts = resolveDateParts({ itemDate: ctx.itemDate, itemYear: ctx.itemYear });
+    if (!parts) return null;
+    const d = new Date(parts.year, parts.month - 1, parts.day);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
   async function autoScrollListToLoadMore(container) {
     if (!container || !CFG.enableAutoListScroll) return;
     const before = getListItems().length;
@@ -1038,11 +1050,23 @@ langEl?.addEventListener('change', () => {
         const { date: startDate, label: startLabel, invalid: startInvalid } = parseInputDate(ui.getStart(), tr('fromLabel'), true);
         const { date: endDate, label: endLabel, invalid: endInvalid } = parseInputDate(ui.getEnd(), tr('toLabel'), false);
         if (startInvalid || endInvalid) return;
-        if (startDate && endDate && startDate > endDate) {
-          ui.setStatus(tr('statusInvalidRange', { from: startLabel, to: endLabel }), '#ffb4b4');
-          return;
+        let lowerDate = null, upperDate = null, lowerLabel = null, upperLabel = null;
+        if (startDate && endDate) {
+          if (startDate <= endDate) {
+            lowerDate = startDate; lowerLabel = startLabel;
+            upperDate = endDate;   upperLabel = endLabel;
+          } else {
+            lowerDate = endDate;   lowerLabel = endLabel;
+            upperDate = startDate; upperLabel = startLabel;
+          }
+        } else if (startDate) {
+          lowerDate = startDate; lowerLabel = startLabel;
+        } else if (endDate) {
+          upperDate = endDate; upperLabel = endLabel;
         }
-        ui.setStatus(tr('statusFilter', { from: startLabel || defaultFromLabel, to: endLabel || defaultToTodayLabel }), '#9fdcff');
+        const dispFrom = lowerLabel || startLabel || defaultFromLabel;
+        const dispTo   = upperLabel || endLabel || defaultToTodayLabel;
+        ui.setStatus(tr('statusFilter', { from: dispFrom, to: dispTo }), '#9fdcff');
         const desiredCount = Infinity;
 
         let listContainer = findScrollableListContainer();
@@ -1056,6 +1080,13 @@ langEl?.addEventListener('change', () => {
             await autoScrollListToLoadMore(listContainer);
             items = getListItems();
             iterations++;
+            if (lowerDate) {
+              const lastDate = getLastItemDate();
+              if (lastDate && lastDate <= lowerDate) {
+                log('Preload stop: last item reached/older than lower bound', lastDate);
+                break;
+              }
+            }
             if (items.length <= before) {
               log('Preload beendet – Einträge geladen:', items.length, '(Scrolls:', iterations, ')');
               break;
@@ -1067,7 +1098,7 @@ langEl?.addEventListener('change', () => {
         ui.setStatus(tr('statusSearch'), '#9fdcff');
 
         const endIdx  = items.length - 1;
-        log('Bereich:', { startIdx: 0, endIdx, startDate: startLabel || defaultFromLabel, endDate: endLabel || defaultToTodayLabel });
+        log('Bereich:', { startIdx: 0, endIdx, startDate: dispFrom, endDate: dispTo });
         let matchedItems = 0;
 
         for (let i = 0; i <= endIdx; i++) {
@@ -1085,8 +1116,8 @@ langEl?.addEventListener('change', () => {
             itemDateObj.setHours(0,0,0,0);
           }
           if (itemDateObj) {
-            if (startDate && itemDateObj < startDate) continue;
-            if (endDate && itemDateObj > endDate) continue;
+            if (lowerDate && itemDateObj < lowerDate) continue;
+            if (upperDate && itemDateObj > upperDate) continue;
           }
           matchedItems++;
           ui.setStatus(tr('statusOpenItem', { i, end: endIdx }));
