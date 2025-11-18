@@ -4,11 +4,8 @@ This userscript is an unofficial, private project and is not affiliated with, en
 Use at your own risk. The author assumes no responsibility for any consequences resulting from its use. 
 
 # Violentmonkey
-To use this script, you need the browser extentension [Violentmonkey](https://violentmonkey.github.io/). This extension allow the execution of user scripts.
-
-## Userscript Manager
-
-Install Violentmonkey from [github.io](https://violentmonkey.github.io/).
+To use this script, you need the browser extentension [Violentmonkey](https://violentmonkey.github.io/). This extension allows the execution of user scripts.
+Install the browser extension from the provided link.
 
 ## Scripts
 
