@@ -201,9 +201,9 @@
   };
 
   const resolveDateParts = (meta = {}) => {
-    const fallbackYear = meta.itemYear || new Date().getFullYear();
+    const yearFromDivider = meta.itemYear || new Date().getFullYear();
     // Datum kommt aus dem Timeline-Subtitle; Jahr aus dem Month-Divider
-    return parseDateString(meta.itemDate, fallbackYear) || null;
+    return parseDateString(meta.itemDate, yearFromDivider) || null;
   };
 
   const formatDateParts = (parts, format) => {
