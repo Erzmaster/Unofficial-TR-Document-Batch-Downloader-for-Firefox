@@ -203,7 +203,7 @@
   const resolveDateParts = (meta = {}) => {
     const fallbackYear = meta.itemYear || new Date().getFullYear();
     // Datum kommt aus dem Timeline-Subtitle; Jahr aus dem Month-Divider
-    return parseDateString(meta.itemDate || meta.itemSubtitle, fallbackYear) || null;
+    return parseDateString(meta.itemDate, fallbackYear) || null;
   };
 
   const formatDateParts = (parts, format) => {
@@ -708,7 +708,7 @@
     const last = items[items.length - 1];
     if (!last) return null;
     const ctx = getTimelineItemContext(last);
-    const parts = resolveDateParts({ itemDate: ctx.itemDate, itemSubtitle: ctx.itemSubtitle, itemYear: ctx.itemYear });
+    const parts = resolveDateParts({ itemDate: ctx.itemDate, itemYear: ctx.itemYear });
     if (!parts) return null;
     const d = new Date(parts.year, parts.month - 1, parts.day);
     d.setHours(0, 0, 0, 0);
