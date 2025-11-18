@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TR Document Batch Downloader
-// @version      2.0
+// @version      3.0
 // @namespace    tr-batch-dl
 // @description  Automatically iterates Trade Republic transaction/activity tabs, opens each entry, and downloads linked documents with optional auto-renaming of file names.
 // @match        https://app.traderepublic.com/*
@@ -11,7 +11,7 @@
 
 (function () {
   "use strict";
-  const SCRIPT_VERSION = "2.0";
+  const SCRIPT_VERSION = "3.0";
   console.log("[GM Test] Version", SCRIPT_VERSION);
 
   // ---------------- Config ----------------
@@ -19,7 +19,7 @@
     enableAutoListScroll: true,
     slowMode: true,
     debugOutline: true,
-    filenameTemplate: '{date}_{title}_{subtitle}_{doc}',
+    filenameTemplate: '{date}_{title}_{subtitle}_{docname}',
     dateFormat: 'YYYYMMDD',
     defaultStartIndex: 0,
     defaultEndIndex: -1,
@@ -65,6 +65,7 @@
   const FILENAME_TEMPLATE_KEY = 'trbd_filename_template';
   const DATE_FORMAT_KEY = 'trbd_date_format';
   const CUSTOM_NAME_KEY = 'trbd_use_custom_names';
+  const LANG_KEY = 'trbd_lang';
   const PAGE = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
   try {
     const storedTemplate = localStorage.getItem(FILENAME_TEMPLATE_KEY);
@@ -214,6 +215,107 @@
     return { itemTitle: title, itemDate: datePart, itemSubtitle: subtitle, itemYear };
   };
 
+  // ---------------- i18n ----------------
+  const STRINGS = {
+    de: {
+      title: 'TR Batch Downloader',
+      fromLabel: 'Von (Datum)',
+      toLabel: 'Bis (Datum)',
+      fromPlaceholder: 'Anfang oder 01.01.2023',
+      toPlaceholder: 'Heute oder 01.01.2025',
+      autoscroll: 'Liste automatisch nachladen',
+      slowMode: 'Slow Mode',
+      customNames: 'Dateinamen umbenennen',
+      filenameLabel: 'Dateinamen-Template',
+      filenameTokens: 'Tokens: {title}, {date}, {subtitle}, {docname}',
+      dateFormatLabel: 'Datumsformat',
+      dateFormatTokens: 'Tokens: YYYY, YY, MM, DD',
+      resetFilename: 'Dateinamen zurücksetzen',
+      resetDate: 'Datumsformat zurücksetzen',
+      resetAll: 'Alles auf Standard',
+      start: 'Start',
+      stop: 'Stop',
+      ready: 'Bereit.',
+      close: '×',
+      langLabel: 'Sprache',
+      statusSearch: 'Suche Listeneinträge …',
+      statusLoadMore: 'Lade weitere Einträge …',
+      statusNoEntries: 'Keine Einträge gefunden.',
+      statusFilter: 'Filter: {from} bis {to} (lade…)',
+      statusStopRequested: 'Stop angefordert …',
+      statusInvalidDate: 'Ungültiges Datum bei "{label}": {value} (z.B. 01.01.2025 oder Heute/Anfang/Ende)',
+      statusInvalidRange: 'Ungültiger Datumsbereich ({from} > {to}).',
+      statusNoRange: 'Keine Einträge im Datumsbereich.',
+      statusRunDone: 'Durchlauf abgeschlossen ✅',
+      statusAborted: 'Abgebrochen.',
+      statusOpenItem: '({i}/{end}) Öffne Eintrag …',
+      statusNoOverlay: '({i}/{end}) Kein Overlay – skip',
+      statusOpenDocs: '({i}/{end}) Öffne Dokumente …',
+      statusCloseOverlay: '({i}/{end}) Schließe Overlay …',
+      statusDoneItem: '({i}/{end}) Fertig – {count} Dokument(e).'
+    },
+    en: {
+      title: 'TR Batch Downloader',
+      fromLabel: 'From (date)',
+      toLabel: 'To (date)',
+      fromPlaceholder: 'Start or 01/01/2023',
+      toPlaceholder: 'Today or 01/01/2025',
+      autoscroll: 'Auto-load list',
+      slowMode: 'Slow mode',
+      customNames: 'Rename file names',
+      filenameLabel: 'Filename template',
+      filenameTokens: 'Tokens: {title}, {date}, {subtitle}, {docname}',
+      dateFormatLabel: 'Date format',
+      dateFormatTokens: 'Tokens: YYYY, YY, MM, DD',
+      resetFilename: 'Reset filename',
+      resetDate: 'Reset date format',
+      resetAll: 'Reset all',
+      start: 'Start',
+      stop: 'Stop',
+      ready: 'Ready.',
+      close: '×',
+      langLabel: 'Language',
+      statusSearch: 'Searching list entries …',
+      statusLoadMore: 'Loading more entries …',
+      statusNoEntries: 'No entries found.',
+      statusFilter: 'Filter: {from} to {to} (loading…)',
+      statusStopRequested: 'Stop requested …',
+      statusInvalidDate: 'Invalid date in "{label}": {value} (e.g. 01/01/2025 or Today/Start/End)',
+      statusInvalidRange: 'Invalid date range ({from} > {to}).',
+      statusNoRange: 'No entries in date range.',
+      statusRunDone: 'Run finished ✅',
+      statusAborted: 'Aborted.',
+      statusOpenItem: '({i}/{end}) Opening entry …',
+      statusNoOverlay: '({i}/{end}) No overlay – skip',
+      statusOpenDocs: '({i}/{end}) Opening documents …',
+      statusCloseOverlay: '({i}/{end}) Closing overlay …',
+      statusDoneItem: '({i}/{end}) Done – {count} document(s).'
+    }
+  };
+
+  const fmt = (tpl = '', ctx = {}) =>
+    tpl.replace(/\{(\w+)\}/g, (_, k) => (ctx[k] !== undefined ? ctx[k] : `{${k}}`));
+
+  const detectPreferredLang = () => {
+    const list = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || navigator.userLanguage]).filter(Boolean);
+    const primary = (list[0] || '').toLowerCase();
+    return primary.startsWith('de') ? 'de' : 'en';
+  };
+
+  let currentLang = (() => {
+    try {
+      const stored = localStorage.getItem(LANG_KEY);
+      if (stored === 'de' || stored === 'en') return stored;
+    } catch {}
+    return detectPreferredLang();
+  })();
+
+  const tr = (key, ctx) => {
+    const dict = STRINGS[currentLang] || STRINGS.en;
+    const fallback = STRINGS.en[key] || key;
+    return fmt(dict[key] || fallback, ctx);
+  };
+
   // ---------------- Download Helper (GM_download) ----------------
   const trackedLocations = new WeakMap();
   const pendingPopups = new Set();
@@ -347,9 +449,10 @@
       title: meta?.itemTitle?.trim() || '',
       date: meta?.itemDate?.trim() || meta?.docDate?.trim() || '',
       subtitle: meta?.itemSubtitle?.trim() || '',
-      doc: meta?.docTitle?.trim() || ''
+      docname: meta?.docTitle?.trim() || '',
+      doc: meta?.docTitle?.trim() || '' // legacy alias
     };
-    if (!tokens.doc) tokens.doc = fallback.replace(/\.pdf$/i, '');
+    if (!tokens.docname) tokens.docname = fallback.replace(/\.pdf$/i, '');
 
     const dateParts = resolveDateParts(meta);
     const formattedDate = dateParts
@@ -357,14 +460,14 @@
       : (meta?.itemDate || meta?.docDate || tokens.date);
     tokens.date = formattedDate || tokens.date;
 
-    let template = CFG.filenameTemplate || '{doc}';
+    let template = CFG.filenameTemplate || '{docname}';
     try {
       const stored = localStorage.getItem(FILENAME_TEMPLATE_KEY);
       if (stored) template = stored;
     } catch {}
 
-    const filled = template.replace(/\{(title|date|subtitle|doc)\}/gi, (_, key) => tokens[key.toLowerCase()] || '');
-    let base = filled.trim() || tokens.doc || fallback.replace(/\.pdf$/i, '');
+    const filled = template.replace(/\{(title|date|subtitle|docname|doc)\}/gi, (_, key) => tokens[key.toLowerCase()] || '');
+    let base = filled.trim() || tokens.docname || tokens.doc || fallback.replace(/\.pdf$/i, '');
     base = sanitizeFilename(base) || 'document';
     if (!/\.pdf$/i.test(base)) base += '.pdf';
     return base;
@@ -576,6 +679,18 @@
     return document.scrollingElement || document.documentElement;
   };
 
+  const getLastItemDate = () => {
+    const items = getListItems();
+    const last = items[items.length - 1];
+    if (!last) return null;
+    const ctx = getTimelineItemContext(last);
+    const parts = resolveDateParts({ itemDate: ctx.itemDate, itemYear: ctx.itemYear });
+    if (!parts) return null;
+    const d = new Date(parts.year, parts.month - 1, parts.day);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
   async function autoScrollListToLoadMore(container) {
     if (!container || !CFG.enableAutoListScroll) return;
     const before = getListItems().length;
@@ -715,6 +830,15 @@
     const templateValue = (storedTemplateValue ?? CFG.filenameTemplate ?? DEFAULT_FILENAME_TEMPLATE).replace(/"/g, '&quot;');
     const dateFormatValue = (storedDateFormatValue ?? CFG.dateFormat ?? DEFAULT_DATE_FORMAT).replace(/"/g, '&quot;');
 
+    const defaultFromLabelUI = currentLang === 'de' ? 'Anfang' : 'Start';
+    const defaultToTodayUI  = currentLang === 'de' ? 'Heute' : 'Today';
+    const titleWithBreak = (() => {
+      const t = tr('title') || 'TR Batch Downloader';
+      const parts = t.split(' ');
+      if (parts.length <= 1) return t;
+      const last = parts.pop();
+      return parts.join(' ') + '\n' + last;
+    })();
     const box = document.createElement('div');
     box.id = UI_ID;
     box.style.cssText = `
@@ -724,39 +848,46 @@
     `;
     box.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <strong>TR Batch Downloader</strong>
-        <button id="trbd-x" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;">×</button>
+        <strong style="white-space:pre-line;line-height:1.2;">${titleWithBreak}</strong>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label for="trbd-lang" style="color:#9ca3af;">${tr('langLabel')}</label>
+          <select id="trbd-lang" style="background:#0b0b0b;color:#fff;border:1px solid #333;border-radius:6px;padding:2px 6px;">
+            <option value="de">Deutsch</option>
+            <option value="en">English</option>
+          </select>
+          <button id="trbd-x" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;">${tr('close')}</button>
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <label>Von<br><input id="trbd-start" type="number" min="0" value="${+localStorage.getItem('trbd_start')||0}" style="width:100%"></label>
-        <label>Bis (-1 Ende)<br><input id="trbd-end" type="number" min="-1" value="${+localStorage.getItem('trbd_end')||-1}" style="width:100%"></label>
+        <label>${tr('fromLabel')}<br><input id="trbd-start" type="text" value="${localStorage.getItem('trbd_start')||defaultFromLabelUI}" style="width:100%" placeholder="${tr('fromPlaceholder')}"></label>
+        <label>${tr('toLabel')}<br><input id="trbd-end" type="text" value="${localStorage.getItem('trbd_end')||defaultToTodayUI}" style="width:100%" placeholder="${tr('toPlaceholder')}"></label>
       </div>
       <label style="display:flex;gap:6px;align-items:center;margin-top:8px;">
-        <input id="trbd-autoscroll" type="checkbox" \${CFG.enableAutoListScroll?'checked':''}> Liste automatisch nachladen
+        <input id="trbd-autoscroll" type="checkbox" \${CFG.enableAutoListScroll?'checked':''}> ${tr('autoscroll')}
       </label>
       <label style="display:flex;gap:6px;align-items:center;margin-top:4px;">
-        <input id="trbd-slow" type="checkbox" \${CFG.slowMode?'checked':''}> Slow Mode
+        <input id="trbd-slow" type="checkbox" \${CFG.slowMode?'checked':''}> ${tr('slowMode')}
       </label>
       <label style="display:flex;gap:6px;align-items:center;margin-top:4px;">
-        <input id="trbd-custom-names" type="checkbox" \${CFG.useCustomNames?'checked':''}> Dateinamen umbenennen
+        <input id="trbd-custom-names" type="checkbox" \${CFG.useCustomNames?'checked':''}> ${tr('customNames')}
       </label>
       <label style="display:flex;flex-direction:column;gap:4px;margin-top:8px;">
-        <span>Dateinamen-Template <span style="font-size:11px;color:#9ca3af;">Tokens: {title}, {date}, {subtitle}, {doc}</span></span>
+        <span>${tr('filenameLabel')} <span style="font-size:11px;color:#9ca3af;">${tr('filenameTokens')}</span></span>
         <input id="trbd-template" type="text" value="${templateValue}" style="width:100%;padding:6px;border-radius:8px;border:1px solid #333;background:#0b0b0b;color:#fff;">
       </label>
       <label style="display:flex;flex-direction:column;gap:4px;margin-top:6px;">
-        <span>Datumsformat <span style="font-size:11px;color:#9ca3af;">Tokens: YYYY, YY, MM, DD</span></span>
+        <span>${tr('dateFormatLabel')} <span style="font-size:11px;color:#9ca3af;">${tr('dateFormatTokens')}</span></span>
         <input id="trbd-dateformat" type="text" value="${dateFormatValue}" style="width:100%;padding:6px;border-radius:8px;border:1px solid #333;background:#0b0b0b;color:#fff;">
       </label>
       <div style="display:flex;gap:8px;margin-top:6px;">
-        <button id="trbd-reset-template" style="flex:1;padding:6px;border-radius:8px;border:1px solid #444;background:#111;color:#eee;cursor:pointer;">Dateinamen zurücksetzen</button>
-        <button id="trbd-reset-date" style="flex:1;padding:6px;border-radius:8px;border:1px solid #444;background:#111;color:#eee;cursor:pointer;">Datumsformat zurücksetzen</button>
+        <button id="trbd-reset-template" style="flex:1;padding:6px;border-radius:8px;border:1px solid #444;background:#111;color:#eee;cursor:pointer;">${tr('resetFilename')}</button>
+        <button id="trbd-reset-date" style="flex:1;padding:6px;border-radius:8px;border:1px solid #444;background:#111;color:#eee;cursor:pointer;">${tr('resetDate')}</button>
       </div>
-      <button id="trbd-reset-all" style="margin-top:6px;width:100%;padding:6px;border-radius:8px;border:1px solid #555;background:#1a1a1a;color:#fff;cursor:pointer;">Alles auf Standard</button>
-      <div id="trbd-status" style="margin:8px 0; min-height:18px; color:#9fdcff;">Bereit.</div>
+      <button id="trbd-reset-all" style="margin-top:6px;width:100%;padding:6px;border-radius:8px;border:1px solid #555;background:#1a1a1a;color:#fff;cursor:pointer;">${tr('resetAll')}</button>
+      <div id="trbd-status" style="margin:8px 0; min-height:18px; color:#9fdcff;">${tr('ready')}</div>
       <div style="display:flex; gap:8px;">
-        <button id="trbd-start-btn" style="flex:1;padding:8px;border-radius:8px;border:none;background:#0ea5e9;color:#fff;cursor:pointer;">Start</button>
-        <button id="trbd-stop-btn" style="flex:1;padding:8px;border-radius:8px;border:1px solid #666;background:#222;color:#eee;cursor:pointer;">Stop</button>
+        <button id="trbd-start-btn" style="flex:1;padding:8px;border-radius:8px;border:none;background:#0ea5e9;color:#fff;cursor:pointer;">${tr('start')}</button>
+        <button id="trbd-stop-btn" style="flex:1;padding:8px;border-radius:8px;border:1px solid #666;background:#222;color:#eee;cursor:pointer;">${tr('stop')}</button>
       </div>
     `;
     document.body.appendChild(box);
@@ -766,6 +897,7 @@ const endEl   = box.querySelector('#trbd-end');
 const autoEl  = box.querySelector('#trbd-autoscroll');
 const slowEl  = box.querySelector('#trbd-slow');
 const customNamesEl = box.querySelector('#trbd-custom-names');
+const langEl = box.querySelector('#trbd-lang');
 const templateEl = box.querySelector('#trbd-template');
 const dateFormatEl = box.querySelector('#trbd-dateformat');
 const resetTemplateBtn = box.querySelector('#trbd-reset-template');
@@ -777,8 +909,8 @@ const stopBtn = box.querySelector('#trbd-stop-btn');
 // Werte aus Storage lesen (Fallbacks aus CFG)
 const storedStart = localStorage.getItem('trbd_start');
 const storedEnd = localStorage.getItem('trbd_end');
-const startDefault = (storedStart ?? CFG.defaultStartIndex).toString();
-const endDefault   = (storedEnd ?? CFG.defaultEndIndex).toString();
+const startDefault = (storedStart ?? defaultFromLabelUI).toString();
+const endDefault   = (storedEnd ?? defaultToTodayUI).toString();
 
 // Sofort setzen
 startEl.value = startDefault;
@@ -786,6 +918,9 @@ endEl.value   = endDefault;
 autoEl.checked = !!CFG.enableAutoListScroll;
 slowEl.checked = !!CFG.slowMode;
 customNamesEl.checked = !!CFG.useCustomNames;
+if (langEl) {
+  langEl.value = currentLang;
+}
 
 // Und noch einmal im nächsten Frame (gegen SPA-Reflow/Hydration)
 requestAnimationFrame(() => {
@@ -794,6 +929,7 @@ requestAnimationFrame(() => {
   autoEl.checked = autoEl.checked ?? !!CFG.enableAutoListScroll;
   slowEl.checked = slowEl.checked ?? !!CFG.slowMode;
   customNamesEl.checked = customNamesEl.checked ?? !!CFG.useCustomNames;
+  if (langEl) langEl.value = langEl.value || currentLang;
   templateEl.value = templateEl.value || (CFG.filenameTemplate ?? DEFAULT_FILENAME_TEMPLATE);
   dateFormatEl.value = dateFormatEl.value || (CFG.dateFormat ?? DEFAULT_DATE_FORMAT);
 });
@@ -821,15 +957,28 @@ resetAllBtn.addEventListener('click', () => {
   autoEl.checked = true;
   slowEl.checked = true;
   customNamesEl.checked = CFG.useCustomNames;
-  startEl.value = CFG.defaultStartIndex;
-  endEl.value = CFG.defaultEndIndex;
+  startEl.value = defaultFromLabelUI;
+  endEl.value = defaultToTodayUI;
   try {
     localStorage.setItem(FILENAME_TEMPLATE_KEY, CFG.filenameTemplate);
     localStorage.setItem(DATE_FORMAT_KEY, CFG.dateFormat);
-    localStorage.setItem('trbd_start', CFG.defaultStartIndex);
-    localStorage.setItem('trbd_end', CFG.defaultEndIndex);
+    localStorage.setItem('trbd_start', defaultFromLabelUI);
+    localStorage.setItem('trbd_end', defaultToTodayUI);
     localStorage.setItem(CUSTOM_NAME_KEY, CFG.useCustomNames);
   } catch {}
+});
+
+langEl?.addEventListener('change', () => {
+  currentLang = (langEl.value === 'de') ? 'de' : 'en';
+  const newDefaultFrom = currentLang === 'de' ? 'Anfang' : 'Start';
+  const newDefaultTo = currentLang === 'de' ? 'Heute' : 'Today';
+  try {
+    localStorage.setItem(LANG_KEY, currentLang);
+    localStorage.setItem('trbd_start', newDefaultFrom);
+    localStorage.setItem('trbd_end', newDefaultTo);
+  } catch {}
+  removeUI();
+  buildUIOnce();
 });
 
 
@@ -841,8 +990,8 @@ resetAllBtn.addEventListener('click', () => {
         this.running = state;
         if (startBtn) startBtn.disabled = state;
       },
-      getStart(){ return +box.querySelector('#trbd-start').value || 0; },
-      getEnd(){ return +box.querySelector('#trbd-end').value ?? -1; },
+      getStart(){ return box.querySelector('#trbd-start').value?.trim() || defaultFromLabelUI; },
+      getEnd(){ return box.querySelector('#trbd-end').value?.trim() || defaultToTodayUI; },
       update(){
         CFG.enableAutoListScroll = box.querySelector('#trbd-autoscroll').checked;
         CFG.slowMode = box.querySelector('#trbd-slow').checked;
@@ -867,63 +1016,138 @@ resetAllBtn.addEventListener('click', () => {
 
       stopFlag = false;
       ui.setRunning(true);
-      ui.setStatus('Suche Listeneinträge …');
+      ui.setStatus(tr('statusSearch'));
       console.group(`${LOG_PREFIX} RUN START`, LOG_STYLE);
 
       try {
+        const defaultFromLabel = currentLang === 'de' ? 'Anfang' : 'Start';
+        const defaultToOpenLabel = currentLang === 'de' ? 'Ende' : 'End';
+        const defaultToTodayLabel = currentLang === 'de' ? 'Heute' : 'Today';
         await ensureActiveTab(desiredPath);
 
+        const parseInputDate = (val, label, isFrom) => {
+          const raw = (val || '').trim();
+          const v = raw.toLowerCase();
+          if (!v || v === 'ende' || v === 'anfang' || v === 'start') {
+            const lbl = isFrom ? defaultFromLabel : defaultToOpenLabel;
+            return { date: null, label: lbl };
+          }
+          if (v === 'heute') {
+            const d = new Date(); d.setHours(0,0,0,0);
+            const lbl = defaultToTodayLabel;
+            return { date: d, label: d.toLocaleDateString() || lbl };
+          }
+          const parsed = parseDateString(v, new Date().getFullYear());
+          if (!parsed) {
+            ui.setStatus(tr('statusInvalidDate', { label, value: raw }), '#ffb4b4');
+            return { date: null, label: raw, invalid: true };
+          }
+          const d = new Date(parsed.year, parsed.month - 1, parsed.day);
+          d.setHours(0,0,0,0);
+          return { date: d, label: d.toLocaleDateString() };
+        };
+
+        const { date: startDate, label: startLabel, invalid: startInvalid } = parseInputDate(ui.getStart(), tr('fromLabel'), true);
+        const { date: endDate, label: endLabel, invalid: endInvalid } = parseInputDate(ui.getEnd(), tr('toLabel'), false);
+        if (startInvalid || endInvalid) return;
+        let lowerDate = null, upperDate = null, lowerLabel = null, upperLabel = null;
+        if (startDate && endDate) {
+          if (startDate <= endDate) {
+            lowerDate = startDate; lowerLabel = startLabel;
+            upperDate = endDate;   upperLabel = endLabel;
+          } else {
+            lowerDate = endDate;   lowerLabel = endLabel;
+            upperDate = startDate; upperLabel = startLabel;
+          }
+        } else if (startDate) {
+          lowerDate = startDate; lowerLabel = startLabel;
+        } else if (endDate) {
+          upperDate = endDate; upperLabel = endLabel;
+        }
+        const dispFrom = lowerLabel || startLabel || defaultFromLabel;
+        const dispTo   = upperLabel || endLabel || defaultToTodayLabel;
+        ui.setStatus(tr('statusFilter', { from: dispFrom, to: dispTo }), '#9fdcff');
+        const desiredCount = Infinity;
+
         let listContainer = findScrollableListContainer();
-        if (CFG.enableAutoListScroll && listContainer) await autoScrollListToLoadMore(listContainer);
-
         let items = getListItems();
+        if (CFG.enableAutoListScroll && listContainer) {
+          ui.setStatus(tr('statusLoadMore'), '#ffd27a');
+          let iterations = 0;
+          while (true) {
+            if (Number.isFinite(desiredCount) && items.length >= desiredCount) break;
+            const before = items.length;
+            await autoScrollListToLoadMore(listContainer);
+            items = getListItems();
+            iterations++;
+            if (lowerDate) {
+              const lastDate = getLastItemDate();
+              if (lastDate && lastDate <= lowerDate) {
+                log('Preload stop: last item reached/older than lower bound', lastDate);
+                break;
+              }
+            }
+            if (items.length <= before) {
+              log('Preload beendet – Einträge geladen:', items.length, '(Scrolls:', iterations, ')');
+              break;
+            }
+          }
+        }
         log('Anzahl Listeneinträge:', items.length);
-        if (!items.length) { ui.setStatus('Keine Einträge gefunden.', '#ffb4b4'); return; }
+        if (!items.length) { ui.setStatus(tr('statusNoEntries'), '#ffb4b4'); return; }
+        ui.setStatus(tr('statusSearch'), '#9fdcff');
 
-        const startIdx = Math.max(0, +ui.box.querySelector('#trbd-start').value || 0);
-        const endRaw  = +ui.box.querySelector('#trbd-end').value;
-        const endIdx  = (isNaN(endRaw) || endRaw < 0) ? (items.length - 1) : Math.min(endRaw, items.length - 1);
-        log('Bereich:', { startIdx, endIdx });
-        if (startIdx > endIdx) { ui.setStatus(`Ungültiger Bereich (${startIdx} > ${endIdx}).`, '#ffb4b4'); return; }
+        const endIdx  = items.length - 1;
+        log('Bereich:', { startIdx: 0, endIdx, startDate: dispFrom, endDate: dispTo });
+        let matchedItems = 0;
 
-        for (let i = startIdx; i <= endIdx; i++) {
+        for (let i = 0; i <= endIdx; i++) {
           if (stopFlag) break;
 
           await ensureActiveTab(desiredPath);
-
-          items = getListItems();
-          if (i >= items.length && CFG.enableAutoListScroll && listContainer) {
-            await autoScrollListToLoadMore(listContainer);
-            items = getListItems();
-          }
           const item = items[i];
           if (!item) { log(`(${i}/${endIdx}) kein Item (nicht geladen) – skip`); continue; }
 
           const itemCtx = getTimelineItemContext(item);
-          ui.setStatus(`(${i}/${endIdx}) Öffne Eintrag …`);
+          const dateParts = resolveDateParts({ itemDate: itemCtx.itemDate, itemYear: itemCtx.itemYear });
+          let itemDateObj = null;
+          if (dateParts) {
+            itemDateObj = new Date(dateParts.year, dateParts.month - 1, dateParts.day);
+            itemDateObj.setHours(0,0,0,0);
+          }
+          if (itemDateObj) {
+            if (lowerDate && itemDateObj < lowerDate) continue;
+            if (upperDate && itemDateObj > upperDate) continue;
+          }
+          matchedItems++;
+          ui.setStatus(tr('statusOpenItem', { i, end: endIdx }));
           const overlay = await openItemOverlay(item, i, endIdx);
           unmark(item);
           if (!overlay || !isVisible(overlay)) {
-            ui.setStatus(`(${i}/${endIdx}) Kein Overlay – skip`, '#ffd27a');
+            ui.setStatus(tr('statusNoOverlay', { i, end: endIdx }), '#ffd27a');
             continue;
           }
 
-          ui.setStatus(`(${i}/${endIdx}) Öffne Dokumente …`);
+          ui.setStatus(tr('statusOpenDocs', { i, end: endIdx }));
           const count = await clickAllDocs(itemCtx);
           if (count === 0) log('→ keine Dokumente (normal)');
 
-          ui.setStatus(`(${i}/${endIdx}) Schließe Overlay …`);
+          ui.setStatus(tr('statusCloseOverlay', { i, end: endIdx }));
           await closeOverlay();
 
           await ensureActiveTab(desiredPath);
           listContainer = findScrollableListContainer();
 
           await sleep(T().afterEachItemPace);
-          ui.setStatus(`(${i}/${endIdx}) Fertig – ${count} Dokument(e).`);
+          ui.setStatus(tr('statusDoneItem', { i, end: endIdx, count }));
           await sleep(T().waitAfterCloseOverlay);
         }
 
-        ui.setStatus(stopFlag ? 'Abgebrochen.' : 'Durchlauf abgeschlossen ✅', '#b6f3b6');
+        if (!stopFlag && matchedItems === 0) {
+          ui.setStatus(tr('statusNoRange'), '#ffd27a');
+        } else {
+          ui.setStatus(stopFlag ? tr('statusAborted') : tr('statusRunDone'), '#b6f3b6');
+        }
       } finally {
         ui.setRunning(false);
         console.groupEnd();
@@ -943,7 +1167,7 @@ resetAllBtn.addEventListener('click', () => {
     });
     stopBtn?.addEventListener('click', () => {
       stopFlag = true;
-      ui.setStatus('Stop angefordert …', '#ffd27a');
+      ui.setStatus(tr('statusStopRequested'), '#ffd27a');
       log('STOP angefordert');
     });
 
