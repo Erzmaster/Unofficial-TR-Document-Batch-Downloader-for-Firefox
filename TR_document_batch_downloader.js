@@ -156,15 +156,32 @@
     if (!str) return null;
     const text = str.trim();
     let day, month, year;
-    let match = text.match(/(\d{1,2})\.(\d{1,2})\.?(\d{2,4})?/);
+
+    // slash format (MM/DD[/YYYY])
+    let match = text.match(/(\d{1,2})\/(\d{1,2})\/?(\d{2,4})?/);
     if (match) {
-      day = parseInt(match[1], 10);
-      month = parseInt(match[2], 10);
+      month = parseInt(match[1], 10);
+      day   = parseInt(match[2], 10);
       if (match[3]) {
         year = parseInt(match[3], 10);
         if (year < 100) year += 2000;
       }
     }
+
+    // dot format (DD.MM[.YYYY])
+    if (!day || !month) {
+      match = text.match(/(\d{1,2})\.(\d{1,2})\.?(\d{2,4})?/);
+      if (match) {
+        day = parseInt(match[1], 10);
+        month = parseInt(match[2], 10);
+        if (match[3]) {
+          year = parseInt(match[3], 10);
+          if (year < 100) year += 2000;
+        }
+      }
+    }
+
+    // textual month (e.g. 1. Oktober)
     if ((!day || !month) && /(\d{1,2})\.\s*[A-Za-zÄÖÜäöü]+/.test(text)) {
       match = text.match(/(\d{1,2})\.\s*([A-Za-zÄÖÜäöü]+)/);
       if (match) {
@@ -173,6 +190,7 @@
         month = MONTH_MAP[normalized];
       }
     }
+
     if (!day || !month) return null;
     year = year || fallbackYear || new Date().getFullYear();
     return { day, month, year };
@@ -1028,11 +1046,11 @@ langEl?.addEventListener('change', () => {
         const parseInputDate = (val, label, isFrom) => {
           const raw = (val || '').trim();
           const v = raw.toLowerCase();
-          if (!v || v === 'ende' || v === 'anfang' || v === 'start') {
+          if (!v || v === 'ende' || v === 'end' || v === 'anfang' || v === 'start') {
             const lbl = isFrom ? defaultFromLabel : defaultToOpenLabel;
             return { date: null, label: lbl };
           }
-          if (v === 'heute') {
+          if (v === 'heute' || v === 'today') {
             const d = new Date(); d.setHours(0,0,0,0);
             const lbl = defaultToTodayLabel;
             return { date: d, label: d.toLocaleDateString() || lbl };
